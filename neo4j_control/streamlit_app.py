@@ -22,7 +22,12 @@ try:
     from neo4j_control.config import ensure_runtime_dirs, get_settings
     from neo4j_control.logging_setup import setup_logging
     from neo4j_control.services.aura import AuraClient
-    from neo4j_control.services.desktop import discover_desktop_dbms
+    from neo4j_control.services.desktop import (
+        DesktopLifecycleError,
+        desktop_start,
+        desktop_stop,
+        discover_desktop_dbms,
+    )
     from neo4j_control.services.docker_discover import discover_docker_neo4j
     from neo4j_control.services.docker_neo4j import (
         DockerUnavailableError,
@@ -130,9 +135,15 @@ def page_overview() -> None:
 
     # ——— Neo4j Desktop ———
     st.subheader("Neo4j Desktop (lokalt)")
+    st.caption(
+        "Status bruger nu pid + port (ikke bare “port 7687 åben”). "
+        "Flere DBMS deler ofte 7687 — kun én kan køre. "
+        "**Fuld styring** af Docker er under Docker lifecycle; Desktop start/stop "
+        "virker kun hvis et `neo4j`-script findes (ellers brug Neo4j Desktop-appen)."
+    )
     desktop, desk_notes = discover_desktop_dbms()
     for note in desk_notes:
-        st.warning(note)
+        st.info(note)
     if not desktop and not desk_notes:
         st.info("Ingen Desktop DBMS fundet.")
     for dbms in desktop:
@@ -141,13 +152,51 @@ def page_overview() -> None:
             with c1:
                 st.markdown(f"**{dbms.name}**")
                 st.caption(f"ID `{dbms.id}` · {dbms.version or 'version?'}")
+                if dbms.status_detail:
+                    st.caption(dbms.status_detail)
             with c2:
                 st.write(f"Status: `{dbms.status}`")
                 st.write(dbms.bolt_uri or "Bolt port ukendt")
-            with c3:
-                dbs = ", ".join(d.name for d in dbms.databases) or "(ingen data/databases endnu)"
+                dbs = ", ".join(d.name for d in dbms.databases) or "(ingen databases endnu)"
                 st.write(f"Databases: {dbs}")
+            with c3:
                 st.caption(dbms.path)
+                if dbms.controllable:
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button(
+                            "Start",
+                            key=f"desk-start-{dbms.id}",
+                            disabled=dbms.status == "running",
+                        ):
+                            try:
+                                msg = desktop_start(dbms.id)
+                                audit("desktop.start", instance=dbms.name, result="ok")
+                                st.success(msg)
+                                st.rerun()
+                            except DesktopLifecycleError as exc:
+                                audit(
+                                    "desktop.start",
+                                    instance=dbms.name,
+                                    result="error",
+                                    detail={"error": str(exc)[:500]},
+                                )
+                                st.error(str(exc))
+                    with b2:
+                        if st.button(
+                            "Stop",
+                            key=f"desk-stop-{dbms.id}",
+                            disabled=dbms.status == "stopped",
+                        ):
+                            try:
+                                msg = desktop_stop(dbms.id)
+                                audit("desktop.stop", instance=dbms.name, result="ok")
+                                st.success(msg)
+                                st.rerun()
+                            except DesktopLifecycleError as exc:
+                                st.error(str(exc))
+                else:
+                    st.caption("Start/stop: brug Neo4j Desktop (ingen neo4j-bin fundet).")
 
     st.divider()
 
