@@ -22,6 +22,8 @@ try:
     from neo4j_control.config import ensure_runtime_dirs, get_settings
     from neo4j_control.logging_setup import setup_logging
     from neo4j_control.services.aura import AuraClient
+    from neo4j_control.services.desktop import discover_desktop_dbms
+    from neo4j_control.services.docker_discover import discover_docker_neo4j
     from neo4j_control.services.docker_neo4j import (
         DockerUnavailableError,
         LifecycleError,
@@ -89,9 +91,116 @@ def _refresh() -> None:
     st.session_state.pop("instances_cache", None)
 
 
+def page_overview() -> None:
+    st.title("Database overview")
+    st.caption(
+        "Sky (Aura) · Neo4j Desktop (lokalt) · Docker (Control + andre containere). "
+        "Genindlæs for at opdatere status."
+    )
+    if st.button("Refresh all sources", type="primary"):
+        audit("overview.refresh", result="ok")
+        st.rerun()
+
+    # ——— Aura (cloud) ———
+    st.subheader("Aura (sky)")
+    probe = aura.probe()
+    if probe.ok:
+        st.success(probe.message)
+    elif probe.configured:
+        st.error(probe.message)
+    else:
+        st.info(probe.message)
+        st.markdown("[Åbn Aura Console](https://console.neo4j.io)")
+    if probe.instances:
+        rows = [
+            {
+                "name": i.get("name"),
+                "status": i.get("status"),
+                "connection": i.get("connection_url"),
+                "region": i.get("region"),
+                "id": i.get("id"),
+            }
+            for i in probe.instances
+        ]
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+    elif probe.configured and probe.ok:
+        st.write("Ingen Aura-instanser på denne konto.")
+
+    st.divider()
+
+    # ——— Neo4j Desktop ———
+    st.subheader("Neo4j Desktop (lokalt)")
+    desktop, desk_notes = discover_desktop_dbms()
+    for note in desk_notes:
+        st.warning(note)
+    if not desktop and not desk_notes:
+        st.info("Ingen Desktop DBMS fundet.")
+    for dbms in desktop:
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([2, 2, 2])
+            with c1:
+                st.markdown(f"**{dbms.name}**")
+                st.caption(f"ID `{dbms.id}` · {dbms.version or 'version?'}")
+            with c2:
+                st.write(f"Status: `{dbms.status}`")
+                st.write(dbms.bolt_uri or "Bolt port ukendt")
+            with c3:
+                dbs = ", ".join(d.name for d in dbms.databases) or "(ingen data/databases endnu)"
+                st.write(f"Databases: {dbs}")
+                st.caption(dbms.path)
+
+    st.divider()
+
+    # ——— Docker ———
+    st.subheader("Docker")
+    docker_views, docker_notes = discover_docker_neo4j(svc)
+    for note in docker_notes:
+        st.warning(note)
+    running = [v for v in docker_views if v.status == "running"]
+    startable = [v for v in docker_views if v.can_start and v.managed]
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Docker Neo4j (alle)", len(docker_views))
+    m2.metric("Kørende nu", len(running))
+    m3.metric("Kan startes (Control)", len(startable))
+
+    if not docker_views:
+        st.info("Ingen Docker Neo4j endnu. Opret under **Docker lifecycle**.")
+    for v in docker_views:
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([2, 2, 2])
+            with c1:
+                badge = "Control" if v.managed else "andet Docker"
+                st.markdown(f"**{v.name}** · _{badge}_")
+                st.caption(v.detail)
+            with c2:
+                st.write(f"Status: `{v.status}`")
+                st.write(v.bolt_uri or "—")
+                if v.image:
+                    st.caption(v.image)
+            with c3:
+                if v.managed and v.can_start:
+                    if st.button("Start", key=f"ov-start-{v.name}"):
+                        try:
+                            with st.spinner(f"Starter {v.name}…"):
+                                svc.start(v.name)
+                            st.success(f"Startet {v.name}")
+                            st.rerun()
+                        except (DockerUnavailableError, LifecycleError, RegistryError) as exc:
+                            st.error(str(exc))
+                elif v.managed and v.status == "running":
+                    if st.button("Stop", key=f"ov-stop-{v.name}"):
+                        try:
+                            svc.stop(v.name)
+                            st.rerun()
+                        except (DockerUnavailableError, LifecycleError, RegistryError) as exc:
+                            st.error(str(exc))
+                elif not v.managed:
+                    st.caption("Ikke styret af Control — brug Docker Desktop/CLI.")
+
+
 def page_instances() -> None:
-    st.title("Neo4j Control")
-    st.caption("Local Docker Neo4j lifecycle · Aura sync & MCP activate later")
+    st.title("Docker lifecycle")
+    st.caption("Create / start / stop / delete Compose stacks. See Overview for Desktop + Aura.")
     _docker_banner()
 
     col_a, col_b = st.columns([2, 1])
@@ -288,7 +397,13 @@ def main() -> None:
         st.markdown("### Neo4j Control")
         page = st.radio(
             "Navigate",
-            ["Instances", "Aura sync", "MCP activate", "Logs & audit"],
+            [
+                "Overview",
+                "Docker lifecycle",
+                "Aura sync",
+                "MCP activate",
+                "Logs & audit",
+            ],
             label_visibility="collapsed",
         )
         st.divider()
@@ -296,7 +411,9 @@ def main() -> None:
         st.caption(f"Data: `{settings.data_dir}`")
         st.caption("Previous Next.js slice is superseded — see README.")
 
-    if page == "Instances":
+    if page == "Overview":
+        page_overview()
+    elif page == "Docker lifecycle":
         page_instances()
     elif page == "Aura sync":
         page_aura()

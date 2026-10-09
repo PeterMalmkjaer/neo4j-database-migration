@@ -6,7 +6,8 @@ Local **Streamlit + Python** app to create, start, stop, and delete isolated **N
 
 > **Note:** An earlier Next.js / Origin slice on branch `cursor/neo4j-control-phase0-1-84bb` is **superseded**. This Streamlit app is the primary UI.
 
-Phase 0–1 covers local Docker lifecycle, logging/audit, and UI placeholders for Aura sync and MCP activate. Aura credentials are **not** required yet.
+Phase 0–1 covers local Docker lifecycle, logging/audit, and MCP placeholders.
+**Overview** lists Aura (cloud, if API keys in `.env`), Neo4j Desktop locals, and Docker (running + startable).
 
 ---
 
