@@ -1,4 +1,6 @@
-# Neo4j Control
+# neo4j-database-migration (Neo4j Control)
+
+A utility for moving a Neo4j database between a local Docker instance and a global Neo4j (Aura) database.
 
 Local **Streamlit + Python** app to create, start, stop, and delete isolated **Neo4j Docker** instances. Built as a **PyCharm-friendly** project for **GitHub**.
 
@@ -98,23 +100,17 @@ See [docs/SECURITY.md](docs/SECURITY.md) and [docs/OPS-LOCAL.md](docs/OPS-LOCAL.
 
 ---
 
-## Push to GitHub
+## Git remotes
 
-This workspace may only have an Origin remote. To publish to **your** GitHub repo:
-
-```bash
-# Create an empty repo on GitHub first, then:
-git remote rename origin origin-cursor   # optional: keep old remote
-git remote add origin https://github.com/<you>/<repo>.git
-git push -u origin cursor/neo4j-control-streamlit-05cc
-# or push main after merge:
-# git checkout main && git merge cursor/neo4j-control-streamlit-05cc && git push -u origin main
-```
-
-If `origin` already points at GitHub, just:
+- **GitHub (canonical):** https://github.com/PeterMalmkjaer/neo4j-database-migration  
+  Remote name in this workspace: `github`
+- **Origin/Cursor** may also exist as `origin` for the cloud agent — leave it alone.
 
 ```bash
-git push -u origin cursor/neo4j-control-streamlit-05cc
+git remote add github https://github.com/PeterMalmkjaer/neo4j-database-migration.git
+git push -u github cursor/neo4j-control-streamlit-05cc
+# Usable default branch (new repo / Initial-commit only):
+git push -u github HEAD:main
 ```
 
 Do **not** commit `.env`, stack `.env` files, or `logs/`.
