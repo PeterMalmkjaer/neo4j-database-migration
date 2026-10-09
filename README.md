@@ -69,13 +69,23 @@ Confirm the run config uses `.venv` (`which python` / `which streamlit` inside t
 
 ## After `git pull` (fix imports)
 
+If the traceback still says `neo4j_control/streamlit_app.py`, **line 9**, and
+`/Library/Frameworks/Python.framework/.../streamlit`, you are on an **old checkout**
+and/or the **system** Streamlit — not the project venv.
+
 ```bash
 cd /path/to/neo4j-database-migration
-git pull
-source .venv/bin/activate                 # create venv first if missing
+git pull origin main                      # or: git pull
+python3 -m venv .venv                     # once
+source .venv/bin/activate
+python -m pip install -U pip
 python -m pip install -e .
 python -m streamlit run app.py --server.port 8517 --server.address 127.0.0.1
 ```
+
+One-liner after pull: `./run_app.sh`
+
+Confirm: `which python` and `which streamlit` both end with `.venv/bin/...` (not Frameworks).
 
 ---
 

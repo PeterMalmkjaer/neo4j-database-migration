@@ -2,7 +2,8 @@
 port = 8517
 address = "127.0.0.1"
 headless = true
-enableCORS = false
+# Keep CORS/XSRF compatible (Streamlit overrides enableCORS=false when XSRF is on)
+enableCORS = true
 enableXsrfProtection = true
 
 [browser]

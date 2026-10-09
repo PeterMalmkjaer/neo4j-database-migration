@@ -17,18 +17,34 @@ if str(_REPO_ROOT) not in sys.path:
 
 import streamlit as st
 
-from neo4j_control.audit import audit, read_audit_tail
-from neo4j_control.config import ensure_runtime_dirs, get_settings
-from neo4j_control.logging_setup import setup_logging
-from neo4j_control.services.aura import AuraClient
-from neo4j_control.services.docker_neo4j import (
-    DockerUnavailableError,
-    LifecycleError,
-    Neo4jDockerService,
-    docker_available,
-)
-from neo4j_control.services.mcp import McpActivator
-from neo4j_control.services.registry import RegistryError
+try:
+    from neo4j_control.audit import audit, read_audit_tail
+    from neo4j_control.config import ensure_runtime_dirs, get_settings
+    from neo4j_control.logging_setup import setup_logging
+    from neo4j_control.services.aura import AuraClient
+    from neo4j_control.services.docker_neo4j import (
+        DockerUnavailableError,
+        LifecycleError,
+        Neo4jDockerService,
+        docker_available,
+    )
+    from neo4j_control.services.mcp import McpActivator
+    from neo4j_control.services.registry import RegistryError
+except ModuleNotFoundError as exc:
+    if getattr(exc, "name", "") == "neo4j_control" or "neo4j_control" in str(exc):
+        raise ModuleNotFoundError(
+            "Package 'neo4j_control' is not importable.\n\n"
+            "Your traceback shows system Frameworks Streamlit and/or an outdated tree.\n"
+            "From the repo root, use the project venv (not /Library/Frameworks/...):\n\n"
+            "  git pull\n"
+            "  python3 -m venv .venv && source .venv/bin/activate\n"
+            "  python -m pip install -e .\n"
+            "  python -m streamlit run app.py --server.port 8517 --server.address 127.0.0.1\n\n"
+            "Or: ./run_app.sh\n"
+            "In PyCharm, set the interpreter to .venv and run module 'streamlit' with\n"
+            "parameters: run app.py --server.port 8517 --server.address 127.0.0.1\n"
+        ) from exc
+    raise
 
 settings = ensure_runtime_dirs(get_settings())
 logger = setup_logging(settings)
