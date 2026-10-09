@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "neo4j-control"
 version = "0.1.0"
@@ -13,6 +17,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff>=0.6.0"]
+
+[project.scripts]
+neo4j-control = "neo4j_control.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["neo4j_control*"]
+
+[tool.setuptools.package-data]
+neo4j_control = ["templates/*.yml"]
 
 [tool.ruff]
 line-length = 100

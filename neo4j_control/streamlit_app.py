@@ -1,8 +1,19 @@
-"""Streamlit UI for Neo4j Control (Phase 0–1)."""
+"""Streamlit UI for Neo4j Control (Phase 0–1).
+
+Prefer launching via project-root ``app.py`` after ``pip install -e .``.
+When this file is targeted directly, ensure the repo root is on ``sys.path``
+so ``import neo4j_control`` works (Streamlit otherwise puts *this* directory first).
+"""
 
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import streamlit as st
 
@@ -279,4 +290,5 @@ def main() -> None:
         page_logs()
 
 
-main()
+if __name__ == "__main__":
+    main()

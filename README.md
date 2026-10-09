@@ -12,42 +12,70 @@ Phase 0–1 covers local Docker lifecycle, logging/audit, and UI placeholders fo
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11+ (`python3` on macOS)
 - Docker Engine + Compose v2 (for start/stop; optional for create/list definitions)
 - PyCharm Professional or Community (optional)
 
 ---
 
-## Quick start (terminal)
+## Quick start (macOS / Linux terminal)
+
+Use a **venv** and an **editable install** so `import neo4j_control` works. Always launch Streamlit with **`python -m streamlit`** from that venv (avoids the system Frameworks Streamlit).
 
 ```bash
-cd /path/to/neo4j-control
+cd /path/to/neo4j-database-migration
 python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env               # edit if needed
-streamlit run neo4j_control/streamlit_app.py --server.port 8517 --server.address 127.0.0.1
+source .venv/bin/activate                 # Windows: .venv\Scripts\activate
+python -m pip install -U pip
+python -m pip install -e .                # installs deps + this package
+cp -n .env.example .env                   # edit if needed
+python -m streamlit run app.py --server.port 8517 --server.address 127.0.0.1
 ```
 
 Open **[http://127.0.0.1:8517](http://127.0.0.1:8517)**.
 
+Equivalent launcher after install: `neo4j-control` or `python -m neo4j_control`.
+
+### Why `pip install -e .` and `app.py`?
+
+`streamlit run neo4j_control/streamlit_app.py` puts `neo4j_control/` on `sys.path`, so `from neo4j_control...` fails unless the package is installed. Running **`app.py` from the repo root** (plus editable install) fixes that.
+
 ---
 
-## Open in PyCharm
+## Open in PyCharm (macOS)
 
-1. **File → Open** the project root (folder containing `README.md` and `neo4j_control/`).
-2. Create a venv: **Settings → Project → Python Interpreter → Add → Virtualenv** (or use existing `.venv`).
-3. Install deps: in the PyCharm terminal run `pip install -r requirements.txt`.
-4. Add a **Streamlit** run configuration:
-   - **Run → Edit Configurations → + → Python**
-   - **Module name:** `streamlit` (enable “Module name” radio)  
-     *or* **Script path:** path to `streamlit` in `.venv/bin/streamlit`
-   - **Parameters:** `run neo4j_control/streamlit_app.py --server.port 8517 --server.address 127.0.0.1`
-   - **Working directory:** project root
-   - **Python interpreter:** the project venv
-5. Run / Debug that configuration.
+1. **File → Open** the clone root (`neo4j-database-migration`, contains `README.md`, `app.py`, `neo4j_control/`).
+2. Interpreter: **Settings → Project → Python Interpreter → Add → Virtualenv**  
+   - Base: `/usr/bin/python3` or Homebrew `python3` (3.11+)  
+   - Location: project `.venv`
+3. In the **PyCharm terminal** (venv active — prompt shows `(.venv)`):
 
-Optional: mark `neo4j_control` as a sources root if imports are not resolved (usually unnecessary when working directory is the project root).
+```bash
+python -m pip install -U pip
+python -m pip install -e .
+cp -n .env.example .env
+```
+
+4. **Run → Edit Configurations → + → Python**:
+   - **Module name:** `streamlit` (select the Module name radio)
+   - **Parameters:** `run app.py --server.port 8517 --server.address 127.0.0.1`
+   - **Working directory:** project root (folder with `app.py`)
+   - **Python interpreter:** the project `.venv` (not system 3.11 Frameworks)
+5. Run / Debug.
+
+Confirm the run config uses `.venv` (`which python` / `which streamlit` inside the run should point under `.venv`).
+
+---
+
+## After `git pull` (fix imports)
+
+```bash
+cd /path/to/neo4j-database-migration
+git pull
+source .venv/bin/activate                 # create venv first if missing
+python -m pip install -e .
+python -m streamlit run app.py --server.port 8517 --server.address 127.0.0.1
+```
 
 ---
 
@@ -66,24 +94,19 @@ Optional: mark `neo4j_control` as a sources root if imports are not resolved (us
 ## Layout
 
 ```
+app.py                      # preferred Streamlit entrypoint (repo root)
+pyproject.toml              # pip install -e .
 neo4j_control/
-  streamlit_app.py          # UI entrypoint
-  config.py                 # .env / paths
-  logging_setup.py          # logs/app.log
-  audit.py                  # logs/audit.log (JSONL)
+  streamlit_app.py          # UI (also path-bootstraps repo root)
+  config.py
+  logging_setup.py
+  audit.py
   models.py
   services/
-    registry.py             # data/instances.json
-    docker_neo4j.py         # Compose lifecycle
-    bolt.py                 # readiness probe
-    aura.py                 # Phase 2 stub
-    mcp.py                  # Phase 4 stub
-  templates/
-    docker-compose.yml      # pinned Neo4j image via env
+  templates/docker-compose.yml
 docs/
   OPS-LOCAL.md
   SECURITY.md
-.data / logs / stacks       # runtime (gitignored)
 ```
 
 ---
@@ -103,15 +126,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) and [docs/OPS-LOCAL.md](docs/OPS-LOCAL.
 ## Git remotes
 
 - **GitHub (canonical):** https://github.com/PeterMalmkjaer/neo4j-database-migration  
-  Remote name in this workspace: `github`
-- **Origin/Cursor** may also exist as `origin` for the cloud agent — leave it alone.
-
-```bash
-git remote add github https://github.com/PeterMalmkjaer/neo4j-database-migration.git
-git push -u github cursor/neo4j-control-streamlit-05cc
-# Usable default branch (new repo / Initial-commit only):
-git push -u github HEAD:main
-```
+- This workspace may also have Cursor `origin` — leave it alone; push with remote `github`.
 
 Do **not** commit `.env`, stack `.env` files, or `logs/`.
 

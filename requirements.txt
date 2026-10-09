@@ -1,3 +1,7 @@
+# Prefer installing the project (pulls these deps + makes imports work):
+#   python -m pip install -e .
+#
+# Or install deps only, then still run: python -m pip install -e .
 streamlit>=1.39.0,<2
 python-dotenv>=1.0.1,<2
 neo4j>=5.26.0,<6

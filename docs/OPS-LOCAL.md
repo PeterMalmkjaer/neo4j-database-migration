@@ -6,6 +6,14 @@
 - Docker Engine + Docker Compose v2 (for start/stop/delete with volumes)
 - PyCharm (optional but recommended)
 
+Install from the repo root with a venv:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+python -m pip install -e .
+python -m streamlit run app.py --server.port 8517 --server.address 127.0.0.1
+```
+
 Without Docker you can still **create**, **list**, and **delete definitions** (compose files + `data/instances.json`). Start/stop require Docker.
 
 ## Create an instance
