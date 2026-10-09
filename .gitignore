@@ -27,7 +27,8 @@ htmlcov/
 
 # App runtime
 logs/
-data/instances/
+data/instances.json
+data/instances.json.tmp
 data/stacks/
 *.log
 
