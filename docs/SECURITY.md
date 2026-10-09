@@ -5,7 +5,9 @@
 - Never commit `.env` or `data/stacks/*/.env`.
 - Stack passwords live only in each stack’s `.env` as `NEO4J_AUTH=neo4j/<password>`.
 - The instance registry (`data/instances.json`) stores ports and paths, **not** passwords.
-- Aura credentials (Phase 2) belong in `.env` only; Phase 0–1 does not require them.
+- Aura credentials belong in `.env` only (gitignored). The **Settings** page can write
+  `AURA_CLIENT_ID` / `AURA_CLIENT_SECRET` into `.env`; secrets are never committed or
+  written to audit logs in full.
 
 ## Destructive actions
 

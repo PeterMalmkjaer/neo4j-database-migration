@@ -35,6 +35,12 @@ try:
         Neo4jDockerService,
         docker_available,
     )
+    from neo4j_control.services.env_file import (
+        ensure_env_file,
+        get_env_value,
+        mask_secret,
+        upsert_env_values,
+    )
     from neo4j_control.services.mcp import McpActivator
     from neo4j_control.services.registry import RegistryError
 except ModuleNotFoundError as exc:
@@ -56,11 +62,15 @@ except ModuleNotFoundError as exc:
 settings = ensure_runtime_dirs(get_settings())
 logger = setup_logging(settings)
 svc = Neo4jDockerService(settings)
-aura = AuraClient(
-    client_id=os.getenv("AURA_CLIENT_ID"),
-    client_secret=os.getenv("AURA_CLIENT_SECRET"),
-)
 mcp = McpActivator()
+
+
+def get_aura_client() -> AuraClient:
+    """Build Aura client from current .env / process env (after Settings save)."""
+    return AuraClient(
+        client_id=get_env_value("AURA_CLIENT_ID"),
+        client_secret=get_env_value("AURA_CLIENT_SECRET"),
+    )
 
 st.set_page_config(
     page_title="Neo4j Control",
@@ -108,14 +118,17 @@ def page_overview() -> None:
 
     # ——— Aura (cloud) ———
     st.subheader("Aura (sky)")
-    probe = aura.probe()
+    probe = get_aura_client().probe()
     if probe.ok:
         st.success(probe.message)
     elif probe.configured:
         st.error(probe.message)
     else:
-        st.info(probe.message)
-        st.markdown("[Åbn Aura Console](https://console.neo4j.io)")
+        st.info(
+            "Aura er ikke konfigureret endnu. Gå til **Settings** i menuen og "
+            "indtast Client ID + Client Secret (skrives til lokal `.env`)."
+        )
+        st.markdown("[Åbn Aura Console → API keys](https://console.neo4j.io)")
     if probe.instances:
         rows = [
             {
@@ -366,31 +379,138 @@ def page_instances() -> None:
                 st.error(str(exc))
 
 
+def page_settings() -> None:
+    st.title("Settings")
+    st.caption(
+        "Gem Aura API-nøgler i lokal `.env` (gitignored). "
+        "Hent nøgler i [Aura Console → Account → API keys](https://console.neo4j.io)."
+    )
+    env_file = ensure_env_file()
+    current_id = get_env_value("AURA_CLIENT_ID")
+    current_secret = get_env_value("AURA_CLIENT_SECRET")
+
+    st.subheader("Aura credentials")
+    st.write(
+        f"Status: **{'konfigureret' if current_id and current_secret else 'ikke sat'}** · "
+        f"fil: `{env_file}`"
+    )
+    if current_id:
+        st.caption(f"Client ID nu: `{mask_secret(current_id, keep=6)}`")
+    if current_secret:
+        st.caption(f"Client Secret nu: `{mask_secret(current_secret, keep=4)}`")
+
+    with st.form("aura_settings_form"):
+        client_id = st.text_input(
+            "AURA_CLIENT_ID",
+            value=current_id,
+            help="Client ID fra Aura API credentials",
+        )
+        client_secret = st.text_input(
+            "AURA_CLIENT_SECRET",
+            value="",
+            type="password",
+            help="Lad være tom for at beholde den eksisterende secret; skriv ny for at erstatte.",
+            placeholder="(uændret hvis tom)" if current_secret else "indsæt secret",
+        )
+        clear = st.checkbox("Fjern Aura-credentials fra .env", value=False)
+        submitted = st.form_submit_button("Gem i .env", type="primary")
+        if submitted:
+            try:
+                if clear:
+                    upsert_env_values({"AURA_CLIENT_ID": "", "AURA_CLIENT_SECRET": ""})
+                    audit("settings.aura.clear", result="ok")
+                    st.success("Aura-credentials fjernet fra .env")
+                else:
+                    updates: dict[str, str] = {}
+                    if client_id.strip():
+                        updates["AURA_CLIENT_ID"] = client_id.strip()
+                    elif not current_id:
+                        st.error("Client ID mangler.")
+                        st.stop()
+                    if client_secret.strip():
+                        updates["AURA_CLIENT_SECRET"] = client_secret.strip()
+                    elif not current_secret:
+                        st.error("Client Secret mangler (første gang skal den udfyldes).")
+                        st.stop()
+                    if not updates:
+                        st.info("Ingen ændringer.")
+                    else:
+                        upsert_env_values(updates)
+                        audit(
+                            "settings.aura.save",
+                            result="ok",
+                            detail={"keys": list(updates.keys())},
+                        )
+                        st.success("Gemt i .env — Overview kan nu liste Aura-instanser.")
+                st.rerun()
+            except OSError as exc:
+                st.error(f"Kunne ikke skrive .env: {exc}")
+
+    st.divider()
+    if st.button("Test Aura-forbindelse"):
+        probe = get_aura_client().probe()
+        audit(
+            "settings.aura.probe",
+            result="ok" if probe.ok else "error",
+            detail={"configured": probe.configured, "count": len(probe.instances)},
+        )
+        if probe.ok:
+            st.success(probe.message)
+            if probe.instances:
+                st.dataframe(
+                    [
+                        {
+                            "name": i.get("name"),
+                            "status": i.get("status"),
+                            "connection": i.get("connection_url"),
+                        }
+                        for i in probe.instances
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        elif probe.configured:
+            st.error(probe.message)
+        else:
+            st.warning(probe.message)
+
+
 def page_aura() -> None:
     st.title("Aura sync")
-    st.caption("Phase 2 placeholder — no live credentials required for Phase 0–1.")
-    probe = aura.probe()
+    st.caption("List via Overview/Settings. Sync/move kommer senere.")
+    probe = get_aura_client().probe()
     if not probe.configured:
-        st.info(probe.message)
+        st.info("Ingen credentials — indtast dem under **Settings**.")
+    elif probe.ok:
+        st.success(probe.message)
     else:
         st.warning(probe.message)
     st.write("Planned actions:")
     st.markdown(
         """
-        - Connect with Aura API credentials (`.env`)
-        - List Aura instances
+        - Connect with Aura API credentials (Settings → `.env`)
+        - List Aura instances (Overview)
         - Directional sync / move with dry-run + verify
         - Aura remains source of truth until sync verified
         """
     )
-    if st.button("Probe Aura (stub)"):
-        audit("aura.probe", result="stub", detail={"configured": probe.configured})
+    if st.button("Probe Aura"):
+        probe = get_aura_client().probe()
+        audit(
+            "aura.probe",
+            result="ok" if probe.ok else "error",
+            detail={"configured": probe.configured, "count": len(probe.instances)},
+        )
+        # Never dump secrets; strip raw blobs
+        safe = [
+            {k: v for k, v in i.items() if k != "raw"} for i in probe.instances
+        ]
         st.json(
             {
                 "configured": probe.configured,
                 "ok": probe.ok,
                 "message": probe.message,
-                "instances": probe.instances,
+                "instances": safe,
             }
         )
 
@@ -450,6 +570,7 @@ def main() -> None:
                 "Overview",
                 "Docker lifecycle",
                 "Aura sync",
+                "Settings",
                 "MCP activate",
                 "Logs & audit",
             ],
@@ -458,7 +579,8 @@ def main() -> None:
         st.divider()
         st.caption(f"Image pin: `{settings.neo4j_image}`")
         st.caption(f"Data: `{settings.data_dir}`")
-        st.caption("Previous Next.js slice is superseded — see README.")
+        aura_ok = bool(get_env_value("AURA_CLIENT_ID") and get_env_value("AURA_CLIENT_SECRET"))
+        st.caption(f"Aura: {'sat' if aura_ok else 'ikke sat'} (Settings)")
 
     if page == "Overview":
         page_overview()
@@ -466,6 +588,8 @@ def main() -> None:
         page_instances()
     elif page == "Aura sync":
         page_aura()
+    elif page == "Settings":
+        page_settings()
     elif page == "MCP activate":
         page_mcp()
     else:
