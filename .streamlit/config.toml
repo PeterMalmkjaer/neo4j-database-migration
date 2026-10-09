@@ -1,0 +1,16 @@
+[server]
+port = 8517
+address = "127.0.0.1"
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#018BFF"
+backgroundColor = "#F7F8FA"
+secondaryBackgroundColor = "#EEF1F6"
+textColor = "#1B1F24"

@@ -1,0 +1,4 @@
+streamlit>=1.39.0,<2
+python-dotenv>=1.0.1,<2
+neo4j>=5.26.0,<6
+PyYAML>=6.0.2,<7

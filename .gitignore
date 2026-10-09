@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+
+# App runtime
+logs/
+data/instances/
+data/stacks/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / local overrides
+.env.local
+.env.*.local
+secrets/

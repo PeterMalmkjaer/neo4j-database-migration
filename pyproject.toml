@@ -1,0 +1,19 @@
+[project]
+name = "neo4j-control"
+version = "0.1.0"
+description = "Local Streamlit app to create, start, stop, and delete Neo4j Docker instances (Aura/MCP later)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "streamlit>=1.39.0,<2",
+  "python-dotenv>=1.0.1,<2",
+  "neo4j>=5.26.0,<6",
+  "PyYAML>=6.0.2,<7",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6.0"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
