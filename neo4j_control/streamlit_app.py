@@ -125,10 +125,10 @@ def page_overview() -> None:
         st.error(probe.message)
     else:
         st.info(
-            "Aura er ikke konfigureret endnu. Gå til **Settings** i menuen og "
-            "indtast Client ID + Client Secret (skrives til lokal `.env`)."
+            "Aura er ikke konfigureret. Det er **API credentials** fra "
+            "[console.neo4j.io](https://console.neo4j.io) (Account → API credentials) — "
+            "ikke database-password. Indtast dem under **Settings**, eller fjern dem dér."
         )
-        st.markdown("[Åbn Aura Console → API keys](https://console.neo4j.io)")
     if probe.instances:
         rows = [
             {
@@ -381,17 +381,28 @@ def page_instances() -> None:
 
 def page_settings() -> None:
     st.title("Settings")
-    st.caption(
-        "Gem Aura API-nøgler i lokal `.env` (gitignored). "
-        "Hent nøgler i [Aura Console → Account → API keys](https://console.neo4j.io)."
+    st.markdown(
+        """
+**Aura API credentials** (ikke database-password / connection URI).
+
+Disse nøgler kommer fra **Aura Console → Account → API credentials** — ikke fra
+Bolt-URI, Neo4j-bruger/password eller Desktop.
+
+- [Åbn Aura Console](https://console.neo4j.io) → log ind → **Account** / profil → **API credentials**
+  (eller *API keys*) → opret Client ID + Client Secret.
+- Appen gemmer dem kun i lokal `.env` (gitignored). Du behøver dem **ikke** for Docker/Desktop.
+
+*These are Aura Console API keys (Client ID / Secret), not your DB URI password.*
+        """
     )
     env_file = ensure_env_file()
     current_id = get_env_value("AURA_CLIENT_ID")
     current_secret = get_env_value("AURA_CLIENT_SECRET")
+    configured = bool(current_id and current_secret)
 
     st.subheader("Aura credentials")
     st.write(
-        f"Status: **{'konfigureret' if current_id and current_secret else 'ikke sat'}** · "
+        f"Status: **{'konfigureret' if configured else 'ikke sat'}** · "
         f"fil: `{env_file}`"
     )
     if current_id:
@@ -401,50 +412,64 @@ def page_settings() -> None:
 
     with st.form("aura_settings_form"):
         client_id = st.text_input(
-            "AURA_CLIENT_ID",
+            "AURA_CLIENT_ID (Client ID)",
             value=current_id,
-            help="Client ID fra Aura API credentials",
+            help="Fra Aura Console → API credentials — ikke database-password.",
+            placeholder="fx Client ID fra console.neo4j.io",
         )
         client_secret = st.text_input(
-            "AURA_CLIENT_SECRET",
+            "AURA_CLIENT_SECRET (Client Secret)",
             value="",
             type="password",
-            help="Lad være tom for at beholde den eksisterende secret; skriv ny for at erstatte.",
-            placeholder="(uændret hvis tom)" if current_secret else "indsæt secret",
+            help="Tom = behold eksisterende secret. Skriv ny værdi for at erstatte.",
+            placeholder="(uændret hvis tom)" if current_secret else "indsæt Client Secret",
         )
-        clear = st.checkbox("Fjern Aura-credentials fra .env", value=False)
         submitted = st.form_submit_button("Gem i .env", type="primary")
         if submitted:
             try:
-                if clear:
-                    upsert_env_values({"AURA_CLIENT_ID": "", "AURA_CLIENT_SECRET": ""})
-                    audit("settings.aura.clear", result="ok")
-                    st.success("Aura-credentials fjernet fra .env")
+                updates: dict[str, str] = {}
+                if client_id.strip():
+                    updates["AURA_CLIENT_ID"] = client_id.strip()
+                elif not current_id:
+                    st.error("Client ID mangler.")
+                    st.stop()
+                if client_secret.strip():
+                    updates["AURA_CLIENT_SECRET"] = client_secret.strip()
+                elif not current_secret:
+                    st.error("Client Secret mangler (første gang skal den udfyldes).")
+                    st.stop()
+                if not updates:
+                    st.info("Ingen ændringer.")
                 else:
-                    updates: dict[str, str] = {}
-                    if client_id.strip():
-                        updates["AURA_CLIENT_ID"] = client_id.strip()
-                    elif not current_id:
-                        st.error("Client ID mangler.")
-                        st.stop()
-                    if client_secret.strip():
-                        updates["AURA_CLIENT_SECRET"] = client_secret.strip()
-                    elif not current_secret:
-                        st.error("Client Secret mangler (første gang skal den udfyldes).")
-                        st.stop()
-                    if not updates:
-                        st.info("Ingen ændringer.")
-                    else:
-                        upsert_env_values(updates)
-                        audit(
-                            "settings.aura.save",
-                            result="ok",
-                            detail={"keys": list(updates.keys())},
-                        )
-                        st.success("Gemt i .env — Overview kan nu liste Aura-instanser.")
+                    upsert_env_values(updates)
+                    audit(
+                        "settings.aura.save",
+                        result="ok",
+                        detail={"keys": list(updates.keys())},
+                    )
+                    st.success("Gemt i .env — Overview kan nu liste Aura-instanser.")
                 st.rerun()
             except OSError as exc:
                 st.error(f"Kunne ikke skrive .env: {exc}")
+
+    st.markdown("##### Fjern credentials")
+    st.caption(
+        "Sletter `AURA_CLIENT_ID` og `AURA_CLIENT_SECRET` fra lokal `.env`. "
+        "Remove stored Aura API keys from `.env`."
+    )
+    if st.button(
+        "Fjern Aura-credentials fra .env",
+        type="secondary",
+        disabled=not (current_id or current_secret),
+        key="clear_aura_creds",
+    ):
+        try:
+            upsert_env_values({"AURA_CLIENT_ID": "", "AURA_CLIENT_SECRET": ""})
+            audit("settings.aura.clear", result="ok")
+            st.success("Aura-credentials er fjernet fra .env.")
+            st.rerun()
+        except OSError as exc:
+            st.error(f"Kunne ikke skrive .env: {exc}")
 
     st.divider()
     if st.button("Test Aura-forbindelse"):
